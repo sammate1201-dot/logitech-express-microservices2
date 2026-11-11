@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: logitech-rabbitmq
+    ports:
+      - "5672:5672"   # Puerto de AMQP
+      - "15672:15672" # Panel de administración
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: logitech-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - PEDIDOS_SERVICE_URL=http://pedidos-service:3001
+    depends_on:
+      - pedidos-service
+
+  pedidos-service:
+    build: ./services/pedidos-service
+    container_name: logitech-pedidos-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  inventario-service:
+    build: ./services/inventario-service
+    container_name: logitech-inventario-service
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  notificaciones-service:
+    build: ./services/notificaciones-service
+    container_name: logitech-notificaciones-service
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
